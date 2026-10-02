@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forgot Password - Covid Vaccination Portal</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { overflow-x: hidden; }
+        .overflow-x-scroll-mobile { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    </style>
+<script id="browser-logger-active">
+(function() {
+    const ENDPOINT = 'http://127.0.0.1:8000/_boost/browser-logs';
+    const logQueue = [];
+    let flushTimeout = null;
+
+    console.log('🔍 Browser logger active (MCP server detected). Posting to: ' + ENDPOINT);
+
+    // Store original console methods
+    const originalConsole = {
+        log: console.log,
+        info: console.info,
+        error: console.error,
+        warn: console.warn,
+        table: console.table
+    };
+
+    // Helper to safely stringify values
+    function safeStringify(obj) {
+        const seen = new WeakSet();
+        return JSON.stringify(obj, (key, value) => {
+            if (typeof value === 'object' && value !== null) {
+                if (seen.has(value)) return '[Circular]';
+                seen.add(value);
+            }
+            if (value instanceof Error) {
+                return {
+                    name: value.name,
+                    message: value.message,
+                    stack: value.stack
+                };
+            }
+            return value;
+        });
+    }
+
+    // Batch and send logs
+    function flushLogs() {
+        if (logQueue.length === 0) return;
+
+        const batch = logQueue.splice(0, logQueue.length);
+
+        fetch(ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ logs: batch })
+        }).catch(err => {
+            // Silently fail to avoid infinite loops
+            originalConsole.error('Failed to send logs:', err);
+        });
+    }
+
+    // Debounced flush (100ms)
+    function scheduleFlush() {
+        if (flushTimeout) clearTimeout(flushTimeout);
+        flushTimeout = setTimeout(flushLogs, 100);
+    }
+
+    // Intercept console methods
+    ['log', 'info', 'error', 'warn', 'table'].forEach(method => {
+        console[method] = function(...args) {
+            // Call original method
+            originalConsole[method].apply(console, args);
+
+            // Capture log data
+            try {
+                logQueue.push({
+                    type: method,
+                    timestamp: new Date().toISOString(),
+                    data: args.map(arg => {
+                        try {
+                            return typeof arg === 'object' ? JSON.parse(safeStringify(arg)) : arg;
+                        } catch (e) {
+                            return String(arg);
+                        }
+                    }),
+                    url: window.location.href,
+                    userAgent: navigator.userAgent
+                });
+
+                scheduleFlush();
+            } catch (e) {
+                // Fail silently
+            }
+        };
+    });
+
+    // Global error handlers for uncaught errors
+    const originalOnError = window.onerror;
+    window.onerror = function boostErrorHandler(errorMsg, url, lineNumber, colNumber, error) {
+        try {
+            logQueue.push({
+                type: 'uncaught_error',
+                timestamp: new Date().toISOString(),
+                data: [{
+                    message: errorMsg,
+                    filename: url,
+                    lineno: lineNumber,
+                    colno: colNumber,
+                    error: error ? {
+                        name: error.name,
+                        message: error.message,
+                        stack: error.stack
+                    } : null
+                }],
+                url: window.location.href,
+                userAgent: navigator.userAgent
+            });
+
+            scheduleFlush();
+        } catch (e) {
+            // Fail silently
+        }
+
+        // Call original handler if it exists
+        if (originalOnError && typeof originalOnError === 'function') {
+            return originalOnError(errorMsg, url, lineNumber, colNumber, error);
+        }
+
+        // Let the error continue to propagate
+        return false;
+    }
+    window.addEventListener('error', (event) => {
+        try {
+            logQueue.push({
+                type: 'window_error',
+                timestamp: new Date().toISOString(),
+                data: [{
+                    message: event.message,
+                    filename: event.filename,
+                    lineno: event.lineno,
+                    colno: event.colno,
+                    error: event.error ? {
+                        name: event.error.name,
+                        message: event.error.message,
+                        stack: event.error.stack
+                    } : null
+                }],
+                url: window.location.href,
+                userAgent: navigator.userAgent
+            });
+
+            scheduleFlush();
+        } catch (e) {
+            // Fail silently
+        }
+
+        // Let the error continue to propagate
+        return false;
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+        try {
+            logQueue.push({
+                type: 'error',
+                timestamp: new Date().toISOString(),
+                data: [{
+                    message: 'Unhandled Promise Rejection',
+                    reason: event.reason instanceof Error ? {
+                        name: event.reason.name,
+                        message: event.reason.message,
+                        stack: event.reason.stack
+                    } : event.reason
+                }],
+                url: window.location.href,
+                userAgent: navigator.userAgent
+            });
+
+            scheduleFlush();
+        } catch (e) {
+            // Fail silently
+        }
+
+        // Let the rejection continue to propagate
+        return false;
+    });
+
+    // Flush on page unload
+    window.addEventListener('beforeunload', () => {
+        if (logQueue.length > 0) {
+            navigator.sendBeacon(ENDPOINT, JSON.stringify({ logs: logQueue }));
+        }
+    });
+})();
+</script>
+</head>
+<body class="text-gray-800 bg-gray-50 overflow-x-hidden">
+
+    
+    
+    <nav class="hidden md:flex bg-gradient-to-r from-[#0f2461] via-[#1a56db] to-[#1e40af] text-white px-6 h-16 items-center mx-4 mt-3 rounded-2xl" style="box-shadow: 0 4px 24px 0 rgba(15,36,97,0.28);">
+
+        
+        <a href="http://127.0.0.1:8000" class="flex items-center gap-3 mr-8">
+            <div class="bg-white rounded-xl p-1.5 shadow">
+                <svg class="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
+            </div>
+            <div class="leading-tight">
+                <p class="font-bold text-sm leading-none tracking-wide">Covid Vaccination Portal</p>
+                <p class="text-blue-300 text-xs">Pakistan COVID-19 System</p>
+            </div>
+        </a>
+
+        
+        <div class="flex items-center gap-1 flex-1">
+
+        
+                                <a href="http://127.0.0.1:8000"
+               class="relative px-4 h-10 flex items-center text-sm font-semibold rounded-lg transition-all duration-150
+                      text-blue-100 hover:bg-white/15 hover:text-white">
+                Home
+            </a>
+                        <a href="http://127.0.0.1:8000/hospitals"
+               class="relative px-4 h-10 flex items-center text-sm font-semibold rounded-lg transition-all duration-150
+                      text-blue-100 hover:bg-white/15 hover:text-white">
+                Hospitals
+            </a>
+                        <a href="http://127.0.0.1:8000/vaccines"
+               class="relative px-4 h-10 flex items-center text-sm font-semibold rounded-lg transition-all duration-150
+                      text-blue-100 hover:bg-white/15 hover:text-white">
+                Vaccines
+            </a>
+                        <a href="http://127.0.0.1:8000/contact"
+               class="relative px-4 h-10 flex items-center text-sm font-semibold rounded-lg transition-all duration-150
+                      text-blue-100 hover:bg-white/15 hover:text-white">
+                Contact
+            </a>
+            
+            
+            <div class="ml-auto flex items-center gap-3">
+                <a href="http://127.0.0.1:8000/login"
+                   class="px-4 py-1.5 text-sm font-semibold border border-white/40 rounded-lg hover:bg-white/10 transition">
+                   Login
+                </a>
+                <a href="http://127.0.0.1:8000/register/patient"
+                   class="px-4 py-1.5 text-sm font-semibold bg-white text-blue-700 rounded-lg hover:bg-blue-50 transition shadow">
+                   Register
+                </a>
+            </div>
+        
+        
+        </div>
+    </nav>
+
+    
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-blue-600 text-white flex justify-around items-center py-2 shadow-lg">
+
+                    
+            <a href="http://127.0.0.1:8000" class="relative flex flex-col items-center hover:text-blue-200">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9.75L12 3l9 6.75V21a1 1 0 01-1 1H5a1 1 0 01-1-1V9.75z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 22V12h6v10"/></svg>
+                            </a>
+            
+            <a href="http://127.0.0.1:8000/hospitals" class="relative flex flex-col items-center hover:text-blue-200">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0h2M5 21H3M9 7h1m-1 4h1m4-4h1m-1 4h1M9 21v-4a1 1 0 011-1h4a1 1 0 011 1v4"/></svg>
+                            </a>
+            
+            <a href="http://127.0.0.1:8000/vaccines" class="relative flex flex-col items-center hover:text-blue-200">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                            </a>
+            
+            <a href="http://127.0.0.1:8000/contact" class="relative flex flex-col items-center hover:text-blue-200">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                            </a>
+            
+            <a href="http://127.0.0.1:8000/login" class="relative flex flex-col items-center hover:text-blue-200">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
+                            </a>
+        
+            </nav>
+
+    
+    <div class="md:hidden h-16"></div>
+
+    
+    <main class="w-full max-w-4xl mx-auto px-4 py-6 overflow-x-hidden">
+        <div class="max-w-md mx-auto">
+    <div class="bg-white rounded-xl shadow-md p-8">
+
+        
+        <div class="text-center mb-6">
+            <div class="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg class="w-7 h-7 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                </svg>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800">Forgot Password</h1>
+            <p class="text-gray-500 text-sm mt-1">Enter your email and we'll send a 5-digit PIN</p>
+        </div>
+
+        
+        
+        <form method="POST" action="http://127.0.0.1:8000/forgot-password" class="space-y-4">
+            <input type="hidden" name="_token" value="fHb1c3g3htpWt4POhAp5l0ZpnmYqGWCe14NSyz9q" autocomplete="off">            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                <input type="email" name="email" value="" required autofocus
+                    placeholder="Enter your registered email"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-gray-500 ">
+            </div>
+
+            <button type="submit"
+                class="w-full bg-gray-800 text-white py-2.5 rounded-lg hover:bg-gray-900 transition font-semibold">
+                Send PIN to Email
+            </button>
+        </form>
+
+        <div class="mt-5 text-center">
+            <a href="http://127.0.0.1:8000/login" class="text-sm text-blue-600 hover:underline">← Back to Login</a>
+        </div>
+    </div>
+</div>
+    </main>
+
+<script src="http://127.0.0.1:8000/js/translations.js"></script>
+</body>
+</html>
